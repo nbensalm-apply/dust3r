@@ -141,6 +141,7 @@ class SceneViz:
 
     def add_camera(self, pose_c2w, focal=None, color=(0, 0, 0), image=None, imsize=None, cam_size=0.03):
         pose_c2w, focal, color, image = to_numpy((pose_c2w, focal, color, image))
+        print("add_scene_cam 1")
         add_scene_cam(self.scene, pose_c2w, color, image, focal, screen_width=cam_size)
         return self
 
@@ -149,6 +150,7 @@ class SceneViz:
         for i, pose_c2w in enumerate(poses):
             self.add_camera(pose_c2w, get(focals, i), image=get(images, i),
                             color=get(colors, i), imsize=get(imsizes, i), **kw)
+
         return self
 
     def show(self, point_size=2):
@@ -183,13 +185,23 @@ def show_raw_pointcloud_with_cams(imgs, pts3d, mask, focals, cams2world,
             camera_edge_color = cam_color[i]
         else:
             camera_edge_color = cam_color or CAM_COLORS[i % len(CAM_COLORS)]
+        print("add_scene_cam 2")
         add_scene_cam(scene, pose_c2w, camera_edge_color,
                       imgs[i] if i < len(imgs) else None, focals[i], screen_width=cam_size)
 
     scene.show(line_settings={'point_size': point_size})
 
+def calculate_normal(vertices):
+    # Assuming vertices is a numpy array of shape (4, 3)
+    # Get vectors from one vertex to the other three vertices
+    v0 = vertices[1] - vertices[0]
+    v1 = vertices[2] - vertices[0]
+    normal = np.cross(v0, v1)
+    normal /= np.linalg.norm(normal)
+    return normal
 
-def add_scene_cam(scene, pose_c2w, edge_color, image=None, focal=None, imsize=None, screen_width=0.03):
+
+def add_scene_cam(scene, pose_c2w, edge_color, image=None, focal=None, imsize=None, screen_width=0.03, image_name = None):
 
     if image is not None:
         H, W, THREE = image.shape
@@ -222,6 +234,12 @@ def add_scene_cam(scene, pose_c2w, edge_color, image=None, focal=None, imsize=No
     # this is the image
     if image is not None:
         vertices = geotrf(transform, cam.vertices[[4, 5, 1, 3]])
+        # print(f'>> camera vertices {vertices} ')
+        middle_point = np.mean(vertices, axis=0)
+        # print("Middle point of the square: with color:", middle_point * 100, edge_color)
+
+        normal = calculate_normal(vertices)
+        # print("Normal to the surface:", normal)
         faces = np.array([[0, 1, 2], [0, 2, 3], [2, 1, 0], [3, 2, 0]])
         img = trimesh.Trimesh(vertices=vertices, faces=faces)
         uv_coords = np.float32([[0, 0], [1, 0], [1, 1], [0, 1]])
@@ -233,6 +251,7 @@ def add_scene_cam(scene, pose_c2w, edge_color, image=None, focal=None, imsize=No
     rot2[:3, :3] = Rotation.from_euler('z', np.deg2rad(2)).as_matrix()
     vertices = np.r_[cam.vertices, 0.95*cam.vertices, geotrf(rot2, cam.vertices)]
     vertices = geotrf(transform, vertices)
+    # print(f'>> camera vertices {vertices} ')
     faces = []
     for face in cam.faces:
         if 0 in face:
@@ -252,9 +271,24 @@ def add_scene_cam(scene, pose_c2w, edge_color, image=None, focal=None, imsize=No
 
     # no culling
     faces += [(c, b, a) for a, b, c in faces]
-
+    # print(f'>> camera faces {faces} ')
     cam = trimesh.Trimesh(vertices=vertices, faces=faces)
     cam.visual.face_colors[:, :3] = edge_color
+    # print("camera center: ", cam.centroid)
+    centroid = cam.centroid
+    # Add a sphere at the tip edge vertex of the cone
+
+    tip_vertex_index = 1 # Assuming the tip edge vertex index is 0
+    tip_vertex = cam.vertices[tip_vertex_index]
+
+    sphere_radius = 0.003  # Adjust the radius of the sphere as needed
+    sphere = trimesh.creation.icosphere(radius=sphere_radius)
+    # sphere.name = 'sphere ' + "Niveau"
+    sphere.metadata['name'] = 'sphere ' + image_name if image_name else '';
+    sphere.apply_translation(tip_vertex)
+    scene.add_geometry(sphere)
+
+
     scene.add_geometry(cam)
 
 

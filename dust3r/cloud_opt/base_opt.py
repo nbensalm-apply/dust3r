@@ -91,14 +91,19 @@ class BasePCOptimizer (nn.Module):
 
         # possibly store images for show_pointcloud
         self.imgs = None
+        self.imgs_name = None
         if 'img' in view1 and 'img' in view2:
             imgs = [torch.zeros((3,)+hw) for hw in self.imshapes]
+            imgs_name = ["" for i in self.imshapes]
             for v in range(len(self.edges)):
                 idx = view1['idx'][v]
                 imgs[idx] = view1['img'][v]
+                imgs_name[idx] = view1['name'][v]
                 idx = view2['idx'][v]
                 imgs[idx] = view2['img'][v]
+                imgs_name[idx] = view2['name'][v]
             self.imgs = rgb(imgs)
+            self.imgs_name = imgs_name
 
     @property
     def n_edges(self):
@@ -328,6 +333,7 @@ class BasePCOptimizer (nn.Module):
         # camera poses
         im_poses = to_numpy(self.get_im_poses())
         if cam_size is None:
+            # Represent the size of camera = 0.1 * the median between camera poses
             cam_size = auto_cam_size(im_poses)
         viz.add_cameras(im_poses, self.get_focals(), colors=colors,
                         images=self.imgs, imsizes=self.imsizes, cam_size=cam_size)

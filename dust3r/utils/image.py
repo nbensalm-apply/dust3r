@@ -89,6 +89,7 @@ def load_images(folder_or_list, size, square_ok=False):
         if not path.lower().endswith(supported_images_extensions):
             continue
         img = exif_transpose(PIL.Image.open(os.path.join(root, path))).convert('RGB')
+        img_name = os.path.basename(path)
         W1, H1 = img.size
         if size == 224:
             # resize short side to 224 (then crop)
@@ -110,7 +111,7 @@ def load_images(folder_or_list, size, square_ok=False):
         W2, H2 = img.size
         print(f' - adding {path} with resolution {W1}x{H1} --> {W2}x{H2}')
         imgs.append(dict(img=ImgNorm(img)[None], true_shape=np.int32(
-            [img.size[::-1]]), idx=len(imgs), instance=str(len(imgs))))
+            [img.size[::-1]]), idx=len(imgs), instance=str(len(imgs)), name=img_name))
 
     assert imgs, 'no images foud at '+root
     print(f' (Found {len(imgs)} images)')

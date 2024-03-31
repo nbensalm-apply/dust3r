@@ -24,6 +24,7 @@ from dust3r.viz import add_scene_cam, CAM_COLORS, OPENGL, pts3d_to_trimesh, cat_
 from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
 
 import matplotlib.pyplot as pl
+
 pl.ion()
 
 torch.backends.cuda.matmul.allow_tf32 = True  # for gpu >= Ampere and pytorch >= 1.12
@@ -46,7 +47,7 @@ def get_args_parser():
     return parser
 
 
-def _convert_scene_output_to_glb(outdir, imgs, pts3d, mask, focals, cams2world, cam_size=0.05,
+def _convert_scene_output_to_glb(outdir, imgs, imgs_name, pts3d, mask, focals, cams2world, cam_size=0.05,
                                  cam_color=None, as_pointcloud=False, transparent_cams=False):
     assert len(pts3d) == len(mask) <= len(imgs) <= len(cams2world) == len(focals)
     pts3d = to_numpy(pts3d)
@@ -75,9 +76,11 @@ def _convert_scene_output_to_glb(outdir, imgs, pts3d, mask, focals, cams2world, 
             camera_edge_color = cam_color[i]
         else:
             camera_edge_color = cam_color or CAM_COLORS[i % len(CAM_COLORS)]
+        print("add_scene_cam 3")
         add_scene_cam(scene, pose_c2w, camera_edge_color,
                       None if transparent_cams else imgs[i], focals[i],
-                      imsize=imgs[i].shape[1::-1], screen_width=cam_size)
+                      imsize=imgs[i].shape[1::-1], screen_width=cam_size,
+                      image_name=imgs_name[i])
 
     rot = np.eye(4)
     rot[:3, :3] = Rotation.from_euler('y', np.deg2rad(180)).as_matrix()
@@ -103,13 +106,15 @@ def get_3D_model_from_scene(outdir, scene, min_conf_thr=3, as_pointcloud=False, 
 
     # get optimized values from scene
     rgbimg = scene.imgs
+    imgs_names = scene.imgs_name
     focals = scene.get_focals().cpu()
     cams2world = scene.get_im_poses().cpu()
     # 3D pointcloud from depthmap, poses and intrinsics
     pts3d = to_numpy(scene.get_pts3d())
     scene.min_conf_thr = float(scene.conf_trf(torch.tensor(min_conf_thr)))
     msk = to_numpy(scene.get_masks())
-    return _convert_scene_output_to_glb(outdir, rgbimg, pts3d, msk, focals, cams2world, as_pointcloud=as_pointcloud,
+    return _convert_scene_output_to_glb(outdir, rgbimg, imgs_names, pts3d, msk, focals, cams2world,
+                                        as_pointcloud=as_pointcloud,
                                         transparent_cams=transparent_cams, cam_size=cam_size)
 
 
@@ -150,9 +155,9 @@ def get_reconstructed_scene(outdir, model, device, image_size, filelist, schedul
     confs = to_numpy([c for c in scene.im_conf])
     cmap = pl.get_cmap('jet')
     depths_max = max([d.max() for d in depths])
-    depths = [d/depths_max for d in depths]
+    depths = [d / depths_max for d in depths]
     confs_max = max([d.max() for d in confs])
-    confs = [cmap(d/confs_max) for d in confs]
+    confs = [cmap(d / confs_max) for d in confs]
 
     imgs = []
     for i in range(len(rgbimg)):
@@ -165,29 +170,30 @@ def get_reconstructed_scene(outdir, model, device, image_size, filelist, schedul
 
 def set_scenegraph_options(inputfiles, winsize, refid, scenegraph_type):
     num_files = len(inputfiles) if inputfiles is not None else 1
-    max_winsize = max(1, (num_files - 1)//2)
+    max_winsize = max(1, (num_files - 1) // 2)
     if scenegraph_type == "swin":
         winsize = gradio.Slider(label="Scene Graph: Window Size", value=max_winsize,
                                 minimum=1, maximum=max_winsize, step=1, visible=True)
         refid = gradio.Slider(label="Scene Graph: Id", value=0, minimum=0,
-                              maximum=num_files-1, step=1, visible=False)
+                              maximum=num_files - 1, step=1, visible=False)
     elif scenegraph_type == "oneref":
         winsize = gradio.Slider(label="Scene Graph: Window Size", value=max_winsize,
                                 minimum=1, maximum=max_winsize, step=1, visible=False)
         refid = gradio.Slider(label="Scene Graph: Id", value=0, minimum=0,
-                              maximum=num_files-1, step=1, visible=True)
+                              maximum=num_files - 1, step=1, visible=True)
     else:
         winsize = gradio.Slider(label="Scene Graph: Window Size", value=max_winsize,
                                 minimum=1, maximum=max_winsize, step=1, visible=False)
         refid = gradio.Slider(label="Scene Graph: Id", value=0, minimum=0,
-                              maximum=num_files-1, step=1, visible=False)
+                              maximum=num_files - 1, step=1, visible=False)
     return winsize, refid
 
 
 def main_demo(tmpdirname, model, device, image_size, server_name, server_port):
     recon_fun = functools.partial(get_reconstructed_scene, tmpdirname, model, device, image_size)
     model_from_scene_fun = functools.partial(get_3D_model_from_scene, tmpdirname)
-    with gradio.Blocks(css=""".gradio-container {margin: 0 !important; min-width: 100%};""", title="DUSt3R Demo") as demo:
+    with gradio.Blocks(css=""".gradio-container {margin: 0 !important; min-width: 100%};""",
+                       title="DUSt3R Demo") as demo:
         # scene state is save so that you can change conf_thr, cam_size... without rerunning the inference
         scene = gradio.State(None)
         gradio.HTML('<h2 style="text-align: center;">DUSt3R Demo</h2>')
