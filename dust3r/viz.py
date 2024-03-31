@@ -283,8 +283,15 @@ def add_scene_cam(scene, pose_c2w, edge_color, image=None, focal=None, imsize=No
 
     sphere_radius = 0.003  # Adjust the radius of the sphere as needed
     sphere = trimesh.creation.icosphere(radius=sphere_radius)
-    # sphere.name = 'sphere ' + "Niveau"
     sphere.metadata['name'] = 'sphere ' + image_name if image_name else '';
+
+    # save rotation
+    # Create a trimesh object
+
+    # Get the rotation matrix of the mesh object
+    rotation_matrix = cam.principal_inertia_transform
+    matrix_string = np.array2string(rotation_matrix)
+    sphere.metadata['transform_mat'] = matrix_string
     sphere.apply_translation(tip_vertex)
     scene.add_geometry(sphere)
 
