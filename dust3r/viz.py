@@ -139,17 +139,17 @@ class SceneViz:
         self.scene.add_geometry(pct)
         return self
 
-    def add_camera(self, pose_c2w, focal=None, color=(0, 0, 0), image=None, imsize=None, cam_size=0.03):
+    def add_camera(self, pose_c2w, focal=None, color=(0, 0, 0), image=None, imsize=None, cam_size=0.03, img_name = None):
         pose_c2w, focal, color, image = to_numpy((pose_c2w, focal, color, image))
         print("add_scene_cam 1")
         add_scene_cam(self.scene, pose_c2w, color, image, focal, screen_width=cam_size)
         return self
 
-    def add_cameras(self, poses, focals=None, images=None, imsizes=None, colors=None, **kw):
+    def add_cameras(self, poses, focals=None, images=None, imsizes=None, colors=None, images_name=None, **kw):
         def get(arr, idx): return None if arr is None else arr[idx]
         for i, pose_c2w in enumerate(poses):
             self.add_camera(pose_c2w, get(focals, i), image=get(images, i),
-                            color=get(colors, i), imsize=get(imsizes, i), **kw)
+                            color=get(colors, i), imsize=get(imsizes, i), images_name=get(images_name,i) , **kw)
 
         return self
 
@@ -283,7 +283,7 @@ def add_scene_cam(scene, pose_c2w, edge_color, image=None, focal=None, imsize=No
 
     sphere_radius = 0.003  # Adjust the radius of the sphere as needed
     sphere = trimesh.creation.icosphere(radius=sphere_radius)
-    sphere.metadata['name'] = 'sphere ' + image_name if image_name else '';
+    sphere.metadata['name'] = 'sphere ' + image_name if image_name else ''
 
     # save rotation
     # Create a trimesh object

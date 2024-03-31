@@ -336,10 +336,10 @@ class BasePCOptimizer (nn.Module):
             # Represent the size of camera = 0.1 * the median between camera poses
             cam_size = auto_cam_size(im_poses)
         viz.add_cameras(im_poses, self.get_focals(), colors=colors,
-                        images=self.imgs, imsizes=self.imsizes, cam_size=cam_size)
+                        images=self.imgs, imsizes=self.imsizes, cam_size=cam_size, images_name=self.imgs_name)
         if show_pw_cams:
             pw_poses = self.get_pw_poses()
-            viz.add_cameras(pw_poses, color=(192, 0, 192), cam_size=cam_size)
+            viz.add_cameras(pw_poses, color=(192, 0, 192), cam_size=cam_size,  images_name=self.imgs_name)
 
             if show_pw_pts3d:
                 pts = [geotrf(pw_poses[e], self.pred_i[edge_str(i, j)]) for e, (i, j) in enumerate(self.edges)]
